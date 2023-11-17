@@ -1,10 +1,10 @@
 import os
 
-from loguru import logger
-from pillow_heif import register_heif_opener
 import torch
 import transformers
-from transformers import CLIPModel, CLIPImageProcessor, CLIPTokenizer
+from loguru import logger
+from pillow_heif import register_heif_opener
+from transformers import CLIPImageProcessor, CLIPModel, CLIPTokenizer
 
 register_heif_opener()
 transformers.logging.set_verbosity(transformers.logging.CRITICAL)
@@ -20,7 +20,7 @@ class CLIP:
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Loading model from: {model_dir} on device: {device}")
-        
+
         self.device = device
         self.model_dir = model_dir
         self.model = CLIPModel.from_pretrained(self.model_dir, local_files_only=True).to(self.device)
@@ -39,31 +39,27 @@ class CLIP:
         self.model.to("cpu")
         del self.model
         torch.cuda.empty_cache()
-        
+
     def _warmup(self, n: int = 5):
         text = "It's getting hot in here..."
         logger.info(f"Warming up model with {n} inferences...")
         for _ in range(n):
             with torch.inference_mode():
                 self.embed_txt(text)
-            
-            
+
     def embed_txt(self, text, normalized: bool = True):
         """Embed a single text query"""
-        inputs = self.tokenizer(text, 
-                                return_tensors='pt',
-                                padding=True,
-                                truncation=True).to(self.device)
+        inputs = self.tokenizer(text, return_tensors="pt", padding=True, truncation=True).to(self.device)
         with torch.inference_mode():
             embeddings = self.model.get_text_features(**inputs)
         embeddings = embeddings.cpu().detach().cpu()
         if normalized:
             embeddings = torch.nn.functional.normalize(embeddings, dim=1)
         return embeddings.numpy()
-    
+
     def embed_imgs(self, imgs, normalized: list[bool] | bool = True):
         """Embed images
-        
+
         Args:
             imgs (`PIL.Image.Image`, `np.ndarray`, `torch.Tensor`, `List[PIL.Image.Image]`, `List[np.ndarray]`, `List[torch.Tensor]`):
                 The image or batch of images to be prepared. Each image can be a PIL image, NumPy array or PyTorch

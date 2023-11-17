@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 
 from dd_clip.core.model import CLIP
-from dd_clip.schemas.request import ClipTextRequest, CLIPImageRequest
+from dd_clip.schemas.request import CLIPImageRequest, ClipTextRequest
 from dd_clip.schemas.response import ClipResponse
 from dd_clip.schemas.settings import settings
 from dd_clip.utils.batch import batch
@@ -23,6 +23,7 @@ except ImportError:
 
 state = {}
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     state["model"] = CLIP(
@@ -31,17 +32,19 @@ async def lifespan(app: FastAPI):
     )
     service_health.status = ServiceHealthStatus.OK
     yield
-    state['model'].decomission()
+    state["model"].decomission()
     state.clear()
 
 
 app = FastAPI(title=service_info.title, version=service_info.version, description=service_info.description, lifespan=lifespan)
 
+
 @batch(max_batch_size=settings.max_batch_size, batch_wait_timeout_s=settings.batch_timeout)
 async def handle_img_batch(requests: CLIPImageRequest):
     imgs, normalized = zip(*requests)
-    embeddings = state['model'].embed_imgs(imgs=imgs, normalized=normalized)
+    embeddings = state["model"].embed_imgs(imgs=imgs, normalized=normalized)
     return embeddings
+
 
 @app.get("/health")
 async def health() -> ServiceHealthStatus:
@@ -54,14 +57,14 @@ async def info() -> ServiceInfo:
 
 
 @app.post("/inference/text", response_model_exclude_none=True)
-async def predict(request: ClipTextRequest) -> ClipResponse:
-    embedding = state['model'].embed_txt(text=request.text, normalized=request.normalized)
+async def infer_text(request: ClipTextRequest) -> ClipResponse:
+    embedding = state["model"].embed_txt(text=request.text, normalized=request.normalized)
     embedding = np.squeeze(embedding)
     return {"embedding": embedding.tolist()}
 
 
 @app.post("/inference", response_model_exclude_none=True)
-async def predict(img: UploadFile, normalized:bool = Form(True)) -> ClipResponse:
+async def infer_image(img: UploadFile, normalized: bool = Form(True)) -> ClipResponse:
     img = await img.read()
     img = Image.open(BytesIO(img)).convert("RGB")
     embedding = await handle_img_batch(CLIPImageRequest(img=img, normalized=normalized))

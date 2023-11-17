@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 
-from pydantic import BaseModel, Field, ConfigDict
 from PIL import Image
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class ClipTextRequest(BaseModel):
     text: str = Field(..., description="Text to embed")
@@ -15,7 +16,8 @@ class ClipTextRequest(BaseModel):
                 }
             ]
         }
-    } 
+    }
+
 
 @dataclass
 class CLIPImageRequest:

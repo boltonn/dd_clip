@@ -1,0 +1,34 @@
+[project]
+name = "dd_clip"
+description = "A repository for image embedding via CLIP."
+keywords = ["computer-vision", "image-embedding", "image-search", "multimodal", "transformers"]
+version = "0.0.1"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python"
+]
+dependencies = [
+    "torch",
+    "torchvision",
+    "transformers",
+    "loguru",
+    "pillow",
+    "pillow-heif",
+    "pydantic>=2",
+    "pydantic-settings",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "black", "flake8", "isort"]
+fastapi = ["uvicorn", "gunicorn", "python-multipart", "aiohttp", "fastapi"]
+kafka = ["faststream[kafka]"]
+rabbit = ["faststream[rabbit]"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[project.scripts]
+queue = "dd_clip.interfaces._queue:main"
+api = "dd_clip.interfaces._api:main"

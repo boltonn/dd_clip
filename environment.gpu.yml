@@ -1,0 +1,11 @@
+name: dd_clip
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - spyder
+  - pip
+  - pip:
+    - --extra-index-url https://download.pytorch.org/whl/cu11
+    - -e .[dev,kafka,fastapi]
+

@@ -15,12 +15,17 @@ from dd_clip.schemas.settings import settings
 
 def load_image(file_path: Path) -> Image.Image:
     try:
-        return Image.open(file_path).convert("RGB")
+        img =  Image.open(file_path).convert("RGB")
+        return None if any([x==1 for x in img.size]) else img
     except UnidentifiedImageError:
         logger.error(f"Failed to load image: {file_path}")
         return None
+    except Exception as e:
+        logger.error(f"Failed to load image: {file_path} | {e}")
+        return None
 
 def load_json(file_path: Path) -> dict:
+    # logger.info(f"Loading json file: {file_path}")
     with open(file_path, "r") as fb:
         return json.load(fb)
     
@@ -31,8 +36,7 @@ def write_json(data:dict, file_path:Path):
 
 def collate(data:list[dict[str, Any]]) -> dict:
     # assumes the same keys are in every file
-    data = [x for x in data if x is not None]
-    data = [x for x in data if x["image"] is not None] if data else data
+    data = [x for x in data if x and x["image"] is not None] if data else data
     if data:
         return {k: [dic[k] for dic in data] for k in data[0].keys()}
 
@@ -66,12 +70,13 @@ class ReferenceDataset(Dataset):
         return len(self.file_paths)
 
     def __getitem__(self, idx):
-        data = load_json(self.file_paths[idx])
+        file_path = self.file_paths[idx]
+        data = load_json(file_path)
         if data.get("data_type") == "image":
             img_path = data.get(self.key)
             img = load_image(img_path)
-            return {
-                self.key: img_path,
+            return data | {
+                "out_path": str(file_path),
                 "image": img,
             }
     
@@ -87,7 +92,7 @@ def main(
     """Go through filles and for image types, embed the image and save the embedding to the file."""
 
     reference_paths = sorted(list(in_dir.rglob("*.json")))
-    dataset = ReferenceDataset(reference_paths)
+    dataset = ReferenceDataset(reference_paths, key=key)
     logger.info(f"Found {len(dataset)} reference files.")
     dataloader = DataLoader(dataset, batch_size=batch_size, num_workers=num_workers, collate_fn=collate)
     
@@ -99,14 +104,15 @@ def main(
     for i, batch in enumerate(dataloader):
         if batch:
             img_batch: list[Image.Image] = batch.pop("image")
+            embeddings = model.embed_imgs(imgs=img_batch, normalized=True)
             batch = uncollate(batch)
-            embeddings = model.embed_imgs(imgs=img_batch)
             for record, embedding in zip(batch, embeddings):
-                record["embeddings"] = {"image": embedding.tolist()}
-                write_json(record, record[key])
+                out_path = record.pop("out_path")
+                record["embedding"] = {"image": embedding.tolist()}
+                write_json(record, out_path)
             n_processed += len(img_batch)
             pbar.set_description(f"Batch {i} | Processed {n_processed} images")
-            pbar.update(1)
+        pbar.update(1)
 
 if __name__ == "__main__":
     import argparse
